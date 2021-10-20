@@ -1,5 +1,20 @@
 from pico2d import *
 
+Tile = [[0 for col in range(1001)] for row in range(1001)]
+
+def fill_tile(x, y, x_size, y_size):
+    x_len = int(x_size / 2)
+    x_min = x - x_len
+    x_max = x + x_len
+
+    y_len = int(y_size / 2)
+    y_min = y - y_len
+    y_max = y + y_len
+    for i in range(y_min, y_max+1):
+        for j in range(x_min, x_max+1):
+            Tile[i][j] = 1
+
+
 
 class Back:
     def __init__(self):
@@ -12,11 +27,15 @@ class Back:
 class Floor:
     def __init__(self):
         self.image = load_image('floor.png')
+        self.x = 400
+        self.y = 30
+        self.x_size = 800
 
     def draw(self):
-        self.image.draw(400, 30)
+        self.image.clip_draw(0, 0, self.x_size, 60, self.x, self.y)
 
-
+FLOOR_HEIGHT = 60
+MARIO_HEIGHT = 51
 # Mario object
 class Mario:
     def __init__(self):
@@ -27,8 +46,7 @@ class Mario:
         self.dir = 0  # 0 - right / 1 - left
         self.state = 0  # 0 - stop / 1 - move / 2 - jump
         self.frame = 0
-        self.jump_vel = 50
-        self.jumping = False
+        self.jump_vel = 0
 
     def move_right(self):
         if self.right_vel < 20:
@@ -51,37 +69,48 @@ class Mario:
         self.frame = 0
 
     def jump_on(self):
-        self.jumping = True
-
-
-
-    def jump(self):
-        if self.jumping:
-            self.y += self.jump_vel
-            self.jump_vel -= 9.8
-            self.state = 2
-        if self.y < 87:
-            self.y = 87
+        if self.jump_vel == 0:
             self.jump_vel = 50
-            self.jumping = False
-            self.state = 0
+            self.y += self.jump_vel
+
+    def falling(self):
+        if self.jump_vel <= 0:
+            foot = self.y - int(MARIO_HEIGHT/2)
+            if Tile[foot][self.x] == 0:
+                self.y += self.jump_vel
+                self.jump_vel -= 10
+                self.state = 2
+                foot = self.y - int(MARIO_HEIGHT / 2)
+                if Tile[foot][self.x] == 1 or foot < 0:
+                    for i in range(foot + 1, 600):
+                        if Tile[i][self.x] == 0:
+                            self.y = i - 1 + int(MARIO_HEIGHT/2)
+                            break
+                    self.jump_vel = 0
+                    self.state = 0
+        else:
+            self.y += self.jump_vel
+            self.jump_vel -= 10
+            self.state = 2
+
 
     def update(self):
         self.frame = (self.frame+1)%3
 
+
     def draw(self):
         if self.state == 1 and self.dir == 0:
-            self.image.clip_draw(31 * (7+self.frame), 0, 31, 17, self.x, self.y, 123, 51)
+            self.image.clip_draw(31 * (7+self.frame), 0, 31, 17, self.x, self.y, 123, MARIO_HEIGHT)
         elif self.state == 0 and self.dir == 0:
-            self.image.clip_draw(31 * 6, 0, 31, 17, self.x, self.y, 123, 51)
+            self.image.clip_draw(31 * 6, 0, 31, 17, self.x, self.y, 123, MARIO_HEIGHT)
         elif self.state == 1 and self.dir == 1:
-            self.image.clip_draw(31 * (4-self.frame), 0, 31, 17, self.x, self.y, 123, 51)
+            self.image.clip_draw(31 * (4-self.frame), 0, 31, 17, self.x, self.y, 123, MARIO_HEIGHT)
         elif self.state == 0 and self.dir == 1:
-            self.image.clip_draw(31 * 5, 0, 31, 17, self.x, self.y, 123, 51)
+            self.image.clip_draw(31 * 5, 0, 31, 17, self.x, self.y, 123, MARIO_HEIGHT)
         elif self.state == 2 and self.dir == 0:
-            self.image.clip_draw(31 * 11, 0, 31, 17, self.x, self.y, 123, 51)
+            self.image.clip_draw(31 * 11, 0, 31, 17, self.x, self.y, 123, MARIO_HEIGHT)
         elif self.state == 2 and self.dir == 1:
-            self.image.clip_draw(0, 0, 31, 17, self.x, self.y, 123, 51)
+            self.image.clip_draw(0, 0, 31, 17, self.x, self.y, 123, MARIO_HEIGHT)
 
 
 
@@ -112,12 +141,20 @@ def handle_events():
 
 open_canvas()
 back = Back()
-floor = Floor()
+
+floors = [Floor() for i in range(3)]
+floors[1].x, floors[1].y, floors[1].x_size = 400, 30, 800
+floors[0].x, floors[0].y, floors[0].x_size = 600, 90, 400
+floors[2].x, floors[2].y, floors[2].x_size = 700, 150, 200
+
 mario = Mario()
 running = True
 run_right = False
 run_left = False
 jump_key_down = False
+
+for floor in floors:
+    fill_tile(floor.x, floor.y, floor.x_size, FLOOR_HEIGHT)
 
 while running:
     handle_events()
@@ -130,14 +167,16 @@ while running:
     else :
         mario.vel_reset()
 
-    mario.jump()
 
 
+    mario.falling()
     mario.update()
+
     # game drawing
     clear_canvas()
     back.draw()
-    floor.draw()
+    for floor in floors:
+        floor.draw()
     mario.draw()
     update_canvas()
     delay(0.05)
