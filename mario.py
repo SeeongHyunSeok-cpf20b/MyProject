@@ -1,54 +1,297 @@
+import game_framework
 from pico2d import *
 
-Tile = [[0 for col in range(1001)] for row in range(1001)]
+import game_world
+import server
+import collision
 
-def fill_tile(x, y, x_size, y_size):
-    x_len = int(x_size / 2)
-    x_min = x - x_len
-    x_max = x + x_len
-
-    y_len = int(y_size / 2)
-    y_min = y - y_len
-    y_max = y + y_len
-    for i in range(y_min, y_max+1):
-        for j in range(x_min, x_max+1):
-            Tile[i][j] = 1
+import title_state
 
 
+# Boy Run Speed
+PIXEL_PER_METER = (10.0 / 0.3)  # 10 pixel 30 cm
+RUN_SPEED_KMPH = 60.0  # Km / Hour
+RUN_SPEED_MPM = (RUN_SPEED_KMPH * 1000.0 / 60.0)
+RUN_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
+RUN_SPEED_PPS = (RUN_SPEED_MPS * PIXEL_PER_METER)
 
-class Back:
-    def __init__(self):
-        self.image = load_image('background.png')
+JUMP_SPEED_KMPH = 80.0  # Km / Hour
+JUMP_SPEED_MPM = (RUN_SPEED_KMPH * 1000.0 / 60.0)
+JUMP_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
+JUMP_SPEED_PPS = (RUN_SPEED_MPS * PIXEL_PER_METER) * 3
 
-    def draw(self):
-        self.image.draw(400,300)
+GRAVITY_MPS = 0.7
+GRAVITY_PPS = (GRAVITY_MPS * PIXEL_PER_METER)
 
+# Boy Event
+RIGHT_DOWN, LEFT_DOWN, RIGHT_UP, LEFT_UP, X_DOWN = range(5)
 
-class Floor:
-    def __init__(self):
-        self.image = load_image('floor.png')
-        self.x = 400
-        self.y = 30
-        self.x_size = 800
+key_event_table = {
+    (SDL_KEYDOWN, SDLK_RIGHT): RIGHT_DOWN,
+    (SDL_KEYDOWN, SDLK_LEFT): LEFT_DOWN,
+    (SDL_KEYUP, SDLK_RIGHT): RIGHT_UP,
+    (SDL_KEYUP, SDLK_LEFT): LEFT_UP,
+    (SDL_KEYDOWN, SDLK_x) : X_DOWN,
+}
 
-    def draw(self):
-        self.image.clip_draw(0, 0, self.x_size, 60, self.x, self.y)
+# Boy Action Speed
+TIME_PER_ACTION = 0.2
+ACTION_PER_TIME = 1.0 / TIME_PER_ACTION
+FRAMES_PER_ACTION = 3
 
 FLOOR_HEIGHT = 60
-MARIO_HEIGHT = 51
+MARIO_HEIGHT = 40
+MARIO_WIDTH = 80
+# Boy States
+class IdleState:
+
+    def enter(mario, event):
+        if event == RIGHT_DOWN:
+            mario.velocity += RUN_SPEED_PPS
+        elif event == LEFT_DOWN:
+            mario.velocity -= RUN_SPEED_PPS
+        elif event == RIGHT_UP:
+            mario.velocity -= RUN_SPEED_PPS
+        elif event == LEFT_UP:
+            mario.velocity += RUN_SPEED_PPS
+
+    def exit(mario, event):
+        if event == X_DOWN and mario.falling== False:
+            mario.jump()
+
+    def do(mario):
+        pass
+
+    def draw(mario):
+        cx, cy = mario.x - server.background.window_left, mario.y - server.background.window_bottom
+        if mario.dead:
+            mario.dead_image.draw(cx,cy)
+        else:
+            if mario.falling:
+                if mario.dir == 1:
+                    mario.image.clip_draw(31 * 11, 0, 31, 17, cx, cy, MARIO_WIDTH, MARIO_HEIGHT)
+                else:
+                    mario.image.clip_draw(0, 0, 31, 17, cx, cy, MARIO_WIDTH, MARIO_HEIGHT)
+            else:
+                if mario.dir == 1:
+                    mario.image.clip_draw(31 * 6, 0, 31, 17, cx, cy, MARIO_WIDTH, MARIO_HEIGHT)
+                else:
+                    mario.image.clip_draw(31 * 5, 0, 31, 17, cx, cy, MARIO_WIDTH, MARIO_HEIGHT)
+
+class RunState:
+    def enter(mario, event):
+        if event == RIGHT_DOWN:
+            mario.velocity += RUN_SPEED_PPS
+        elif event == LEFT_DOWN:
+            mario.velocity -= RUN_SPEED_PPS
+        elif event == RIGHT_UP:
+            mario.velocity -= RUN_SPEED_PPS
+        elif event == LEFT_UP:
+            mario.velocity += RUN_SPEED_PPS
+        mario.dir = clamp(-1, mario.velocity, 1)
+
+    def exit(mario, event):
+        if event == X_DOWN and mario.falling == False:
+            mario.jump()
+
+    def do(mario):
+        # boy.frame = (boy.frame + 1) % 8
+        mario.frame = (mario.frame + FRAMES_PER_ACTION * ACTION_PER_TIME * game_framework.frame_time) % 3
+
+        mario.x += mario.velocity * game_framework.frame_time
+
+        if mario.dir == 1:
+            if (collision.collide_side(mario.x, mario.y - MARIO_HEIGHT/2 + 10, server.stage1_1)):
+                temp_x = ((mario.x / 40) - 1) * 40
+                mario.x = temp_x - 12
+        else :
+            if (collision.collide_side(mario.x, mario.y - MARIO_HEIGHT / 2 + 10, server.stage1_1)):
+                temp_x = (mario.x / 40) * 40
+                mario.x = temp_x + 15 + 2
+
+
+    def draw(mario):
+        cx, cy = mario.x - server.background.window_left, mario.y - server.background.window_bottom
+        if mario.dead:
+            mario.dead_image.draw(cx,cy)
+        else:
+            if mario.falling:
+                if mario.dir == 1:
+                    mario.image.clip_draw(31 * 11, 0, 31, 17, cx, cy, MARIO_WIDTH, MARIO_HEIGHT)
+                else:
+                    mario.image.clip_draw(0, 0, 31, 17, cx, cy, MARIO_WIDTH, MARIO_HEIGHT)
+            else:
+                if mario.dir == 1:
+                    mario.image.clip_draw(31 * int(7+mario.frame), 0, 31, 17, cx, cy, MARIO_WIDTH, MARIO_HEIGHT)
+                else:
+                    mario.image.clip_draw(31 * int(4-mario.frame), 0, 31, 17, cx, cy, MARIO_WIDTH, MARIO_HEIGHT)
+
+
+
+
+next_state_table = {
+    IdleState: {RIGHT_UP: RunState, LEFT_UP: RunState, RIGHT_DOWN: RunState, LEFT_DOWN: RunState, X_DOWN: IdleState},
+    RunState: {RIGHT_UP: IdleState, LEFT_UP: IdleState, LEFT_DOWN: IdleState, RIGHT_DOWN: IdleState, X_DOWN: RunState},
+}
+
+
 # Mario object
 class Mario:
     def __init__(self):
         self.image = load_image('mario.png')
-        self.x, self.y = 50, 87
-        self.right_vel = 0
-        self.left_vel = 0
-        self.dir = 0  # 0 - right / 1 - left
-        self.state = 0  # 0 - stop / 1 - move / 2 - jump
+        self.font = load_font('ENCR10B.TTF', 16)
+        self.end_image = load_image('win.png')
+        self.dead_image = load_image('dead.png')
+        self.x, self.y = 50, 100
+        self.falling = False
+        self.velocity = 0
+        self.jump_velocity = 0
+        self.dir = 1  # 0 - right / 1 - left
+        self.event_que = []
+        self.cur_state = IdleState
+        self.cur_state.enter(self, None)
         self.frame = 0
-        self.jump_vel = 0
+        self.jump_velocity = 0
+        self.end = False
+        self.win = False
+        self.dead = False
 
-    def move_right(self):
+        self.jump_bgm = load_music('jump.mp3')
+
+        self.clear_bgm = load_music('clear.wav')
+
+        self.coin_bgm = load_music('coin.mp3')
+
+        self.dead_bgm = load_music('dead.mp3')
+
+
+        self.stomp_bgm = load_music('stomp.wav')
+
+
+        self.fall = GRAVITY_MPS
+        self.d = 0
+
+        self.start_time = 0
+        self.end_time = 0
+
+
+    def get_bb(self):
+        # fill here
+        cx, cy = self.x - server.background.window_left, self.y - server.background.window_bottom
+        return cx - 15, cy - MARIO_HEIGHT/2, cx + 12, cy + MARIO_HEIGHT/2
+
+    def jump(self):
+        self.jump_bgm.set_volume(32)
+        self.jump_bgm.play(1)
+        self.falling = True
+        self.jump_velocity = JUMP_SPEED_PPS
+
+    def add_event(self, event):
+        self.event_que.insert(0, event)
+
+    def update(self):
+        if (self.win):
+            self.end_time = get_time()
+            if (self.end_time - self.start_time > 6):
+                game_framework.change_state(title_state)
+                return
+
+        if (self.dead):
+            self.velocity = 0
+            self.y+=self.fall
+            self.d += self.fall
+            if (self.d > 100):
+                self.d = 0
+                self.fall *= -1
+
+            if self.y < 0:
+                game_framework.change_state(title_state)
+                return
+
+
+        self.cur_state.do(self)
+        if len(self.event_que) > 0:
+            event = self.event_que.pop()
+            self.cur_state.exit(self, event)
+            self.cur_state = next_state_table[self.cur_state][event]
+            self.cur_state.enter(self, event)
+
+        if (self.falling):
+            self.y += int(self.jump_velocity * game_framework.frame_time)
+
+            for i in range(15):
+                if (collision.colide(self, server.enemy[i]) and server.enemy[i].live and self.dead == False):
+                    self.stomp_bgm.set_volume(100)
+                    self.stomp_bgm.play(1)
+                    self.jump_velocity = JUMP_SPEED_PPS / 2
+                    server.enemy[i].dead()
+
+            if (self.jump_velocity > 0 and (collision.collide_itembox(self.x-15, self.y + MARIO_HEIGHT/2 + 2, server.stage1_1)
+                                      or collision.collide_itembox(self.x+15, self.y + MARIO_HEIGHT/2 + 2, server.stage1_1))):
+                self.coin_bgm.set_volume(96)
+                self.coin_bgm.play(1)
+                self.jump_velocity = 0
+                self.y -= int(self.jump_velocity * game_framework.frame_time)
+
+            if (self.jump_velocity > 0 and (collision.collide_bottom(self.x-15, self.y + MARIO_HEIGHT/2 + 2, server.stage1_1)
+                                      or collision.collide_bottom(self.x+15, self.y + MARIO_HEIGHT/2 + 2, server.stage1_1))):
+                self.jump_velocity = 0
+                self.y -= int(self.jump_velocity * game_framework.frame_time)
+
+            self.jump_velocity -= GRAVITY_PPS
+
+            if (self.y < 0):
+                self.dead_bgm.set_volume(90)
+                self.dead_bgm.play(1)
+                self.dead = True
+
+
+
+
+        if (self.jump_velocity <= 0 and collision.collide_bottom(self.x-15, self.y - MARIO_HEIGHT/2 - 2, server.stage1_1)
+                or collision.collide_bottom(self.x+12, self.y - MARIO_HEIGHT/2 - 2, server.stage1_1)):
+            self.falling = False
+            self.jump_velocity = 0
+        else:
+            self.falling = True
+
+        for i in range(15):
+            if (collision.colide(self, server.enemy[i]) and server.enemy[i].live):
+                self.dead_bgm.set_volume(64)
+                self.dead_bgm.play(1)
+                self.dead = True
+                break
+
+        if (collision.collide_end(self.x, self.y, server.stage1_1)):
+            self.clear_bgm.set_volume(90)
+            self.clear_bgm.play(1)
+            self.end = True;
+            self.start_time = get_time()
+
+
+
+        self.x = clamp(0, self.x, server.background.w - 1)
+        self.y = clamp(0, self.y, server.background.h - 1)
+
+    def draw(self):
+
+        self.cur_state.draw(self)
+        # cx, cy = self.x - server.background.window_left, self.y - server.background.window_bottom
+        # self.font.draw(cx - 60, cy + 50, '(Time: %3.2f)' % get_time(), (255, 255, 0))
+        # draw_rectangle(*self.get_bb())
+        # debug_print(str(self.y) +'Velocity :' + str(self.velocity) + '  Dir:' + str(self.dir) + ' Frame Time:' + str(
+        #     game_framework.frame_time) )
+
+        if (self.end):
+            self.end_image.draw(400, 300)
+            self.win =True
+
+
+    def handle_event(self, event):
+        if (event.type, event.key) in key_event_table:
+            key_event = key_event_table[(event.type, event.key)]
+            self.add_event(key_event)
+    """def move_right(self):
         if self.right_vel < 20:
             self.right_vel += 5
         self.x += self.right_vel
@@ -110,77 +353,5 @@ class Mario:
         elif self.state == 2 and self.dir == 0:
             self.image.clip_draw(31 * 11, 0, 31, 17, self.x, self.y, 123, MARIO_HEIGHT)
         elif self.state == 2 and self.dir == 1:
-            self.image.clip_draw(0, 0, 31, 17, self.x, self.y, 123, MARIO_HEIGHT)
+            self.image.clip_draw(0, 0, 31, 17, self.x, self.y, 123, MARIO_HEIGHT)"""
 
-
-
-
-
-def handle_events():
-    global mario
-    global running, run_right, run_left, jump_key_down
-    events = get_events()
-    for event in events:
-        if event.type == SDL_QUIT:
-            running = False
-        elif event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
-            running = False
-        elif event.type == SDL_KEYDOWN and event.key == SDLK_RIGHT:
-            run_right = True
-        elif event.type == SDL_KEYDOWN and event.key == SDLK_LEFT:
-            run_left = True
-        elif event.type == SDL_KEYUP and event.key == SDLK_RIGHT:
-            run_right = False
-        elif event.type == SDL_KEYUP and event.key == SDLK_LEFT:
-            run_left = False
-
-        if event.type == SDL_KEYDOWN and event.key == SDLK_a:
-            mario.jump_on()
-
-
-
-open_canvas()
-back = Back()
-
-floors = [Floor() for i in range(3)]
-floors[1].x, floors[1].y, floors[1].x_size = 400, 30, 800
-floors[0].x, floors[0].y, floors[0].x_size = 600, 90, 400
-floors[2].x, floors[2].y, floors[2].x_size = 700, 150, 200
-
-mario = Mario()
-running = True
-run_right = False
-run_left = False
-jump_key_down = False
-
-for floor in floors:
-    fill_tile(floor.x, floor.y, floor.x_size, FLOOR_HEIGHT)
-
-while running:
-    handle_events()
-
-    # game logic
-    if run_right:
-        mario.move_right()
-    elif run_left:
-        mario.move_left()
-    else :
-        mario.vel_reset()
-
-
-
-    mario.falling()
-    mario.update()
-
-    # game drawing
-    clear_canvas()
-    back.draw()
-    for floor in floors:
-        floor.draw()
-    mario.draw()
-    update_canvas()
-    delay(0.05)
-
-
-# finalization code
-close_canvas()
