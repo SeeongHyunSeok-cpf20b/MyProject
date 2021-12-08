@@ -17,6 +17,10 @@ FALL_SPEED_MPM = (RUN_SPEED_KMPH * 1000.0 / 60.0)
 FALL_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
 FALL_SPEED_PPS = (RUN_SPEED_MPS * PIXEL_PER_METER)
 
+TIME_PER_ACTION = 0.2
+ACTION_PER_TIME = 1.0 / TIME_PER_ACTION
+FRAMES_PER_ACTION = 2
+
 FLOOR_HEIGHT = 60
 ENEMY_HEIGHT = 56
 # Mario object
@@ -57,7 +61,7 @@ class Enemy:
                     temp_x = (self.x / 40) * 40
                     self.x = temp_x + 15 + 2
                     self.vel = RUN_SPEED_PPS * game_framework.frame_time
-            self.frame = (self.frame+1) % 2
+            self.frame = (self.frame + FRAMES_PER_ACTION * ACTION_PER_TIME * game_framework.frame_time) % 2
         else:
             self.y += self.fall
             if (self.y < -40):
@@ -66,7 +70,7 @@ class Enemy:
     def draw(self):
         cx, cy = self.x - server.background.window_left , self.y - server.background.window_bottom
 
-        self.image.clip_draw(self.frame * 29, 0, 29, 28, cx, cy, 60, 60)
+        self.image.clip_draw(int(self.frame) * 29, 0, 29, 28, cx, cy, 60, 60)
 
 
     def dead(self):

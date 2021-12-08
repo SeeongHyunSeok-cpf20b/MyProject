@@ -101,13 +101,13 @@ class RunState:
         mario.x += mario.velocity * game_framework.frame_time
 
         if mario.dir == 1:
-            if (collision.collide_side(mario.x, mario.y - MARIO_HEIGHT/2 + 10, server.stage1_1)):
+            if (collision.collide_side(mario.x+ 15, mario.y - MARIO_HEIGHT/2 + 10, server.stage1_1)):
                 temp_x = ((mario.x / 40) - 1) * 40
-                mario.x = temp_x - 12
+                mario.x -= mario.velocity * game_framework.frame_time
         else :
-            if (collision.collide_side(mario.x, mario.y - MARIO_HEIGHT / 2 + 10, server.stage1_1)):
+            if (collision.collide_side(mario.x - 15, mario.y - MARIO_HEIGHT / 2 + 10, server.stage1_1)):
                 temp_x = (mario.x / 40) * 40
-                mario.x = temp_x + 15 + 2
+                mario.x -= mario.velocity * game_framework.frame_time
 
 
     def draw(mario):

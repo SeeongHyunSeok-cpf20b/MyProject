@@ -17,7 +17,7 @@ class FixedBackground:
 
         # self.bgm = load_music('main_bgm.mp3')
         # self.bgm.set_volume(64)
-        self.bgm.repeat_play()
+        # self.bgm.repeat_play()
 
         server.stage1_1 = []
         f = open('1-1.txt', 'r')
