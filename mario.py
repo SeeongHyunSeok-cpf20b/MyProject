@@ -197,8 +197,9 @@ class Mario:
                 return
 
         if (self.dead):
+            self.falling = False
             self.velocity = 0
-            self.y+=self.fall
+            self.y += self.fall
             self.d += self.fall
             if (self.d > 100):
                 self.d = 0
@@ -257,9 +258,10 @@ class Mario:
 
         for i in range(15):
             if (collision.colide(self, server.enemy[i]) and server.enemy[i].live):
-                self.dead_bgm.set_volume(64)
-                self.dead_bgm.play(1)
-                self.dead = True
+                if(self.dead == False):
+                    self.dead_bgm.set_volume(64)
+                    self.dead_bgm.play(1)
+                    self.dead = True
                 break
 
         if (collision.collide_end(self.x, self.y, server.stage1_1)):
